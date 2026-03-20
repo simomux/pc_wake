@@ -6,14 +6,14 @@
 // Normally your 4-digit PIN; rarely Windows may require the full account password
 #define WIN_PIN          ""
 
-// Static IP for this Arduino
-#define LOCAL_IP_0  192
-#define LOCAL_IP_1  168
-#define LOCAL_IP_2    1
-#define LOCAL_IP_3   20
+// Static IP for this Arduino (e.g. 192, 168, 1, 20)
+#define LOCAL_IP_0  0
+#define LOCAL_IP_1  0
+#define LOCAL_IP_2  0
+#define LOCAL_IP_3  0
 
-// Gateway / router IP
-#define GATEWAY_0   192
-#define GATEWAY_1   168
-#define GATEWAY_2     1
-#define GATEWAY_3     1
+// Gateway / router IP (e.g. 192, 168, 1, 1)
+#define GATEWAY_0   0
+#define GATEWAY_1   0
+#define GATEWAY_2   0
+#define GATEWAY_3   0
