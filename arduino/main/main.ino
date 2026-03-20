@@ -2,15 +2,15 @@
 #include <Keyboard.h>
 #include "config.h"   // copy config.h.example → config.h and fill in your values
 
-// ── Configurazione ──────────────────────────────────────────────
+// ── Configuration ───────────────────────────────────────────────
 IPAddress LOCAL_IP(LOCAL_IP_0, LOCAL_IP_1, LOCAL_IP_2, LOCAL_IP_3);
 IPAddress GATEWAY(GATEWAY_0,   GATEWAY_1,  GATEWAY_2,  GATEWAY_3);
 IPAddress SUBNET(255, 255, 255, 0);
 IPAddress DNS(8, 8, 8, 8);
 
-const int  RELAY_PIN      = 2;          // D2 → base transistor PN2222A
-const int  PULSE_MS       = 200;        // durata pressione power button
-const int  WIN_BOOT_DELAY = 35;         // secondi attesa boot Windows
+const int  RELAY_PIN      = 2;          // D2 → PN2222A base
+const int  PULSE_MS       = 200;        // power button press duration (ms)
+const int  WIN_BOOT_DELAY = 35;         // seconds to wait for Windows to boot
 // ────────────────────────────────────────────────────────────────
 
 WiFiServer server(80);
@@ -23,10 +23,10 @@ void setup() {
 
   Keyboard.begin();
 
-  // IP statico
+  // Static IP
   WiFi.config(LOCAL_IP, DNS, GATEWAY, SUBNET);
 
-  Serial.print("Connessione a ");
+  Serial.print("Connecting to ");
   Serial.println(WIFI_SSID);
 
   while (WiFi.begin(WIFI_SSID, WIFI_PASSWORD) != WL_CONNECTED) {
@@ -34,26 +34,26 @@ void setup() {
     Serial.print(".");
   }
 
-  Serial.println("\nWiFi connesso");
+  Serial.println("\nWiFi connected");
   Serial.print("IP: ");
   Serial.println(WiFi.localIP());
 
   server.begin();
-  Serial.println("HTTP server avviato");
+  Serial.println("HTTP server started");
 }
 
 void loop() {
   WiFiClient client = server.available();
   if (!client) return;
 
-  // Leggi prima riga della request
+  // Read first line of the request
   String requestLine = "";
   while (client.connected() && client.available()) {
     char c = client.read();
     if (c == '\n') break;
     requestLine += c;
   }
-  // Consuma gli header rimanenti
+  // Drain remaining headers
   while (client.connected() && client.available()) {
     String line = client.readStringUntil('\n');
     if (line == "\r") break;
@@ -66,7 +66,7 @@ void loop() {
   } else if (requestLine.indexOf("POST /type-password") >= 0) {
     handleTypePassword(client);
   } else if (requestLine.indexOf("POST /wake") >= 0) {
-    // Endpoint tutto-in-uno: power + attesa boot + digita password
+    // All-in-one: power + wait for boot + type PIN
     handleWake(client);
   } else if (requestLine.indexOf("GET /status") >= 0) {
     sendResponse(client, 200, "{\"status\":\"ok\"}");
@@ -83,14 +83,14 @@ void handlePower(WiFiClient& client) {
   sendResponse(client, 200, "{\"action\":\"power_pulse\",\"ms\":" + String(PULSE_MS) + "}");
 }
 
-// ── Handler: digita password (da chiamare dopo boot manuale) ─────
+// ── Handler: type PIN (call when PC is already on) ───────────────
 void handleTypePassword(WiFiClient& client) {
   sendResponse(client, 200, "{\"action\":\"typing\"}");
   client.stop();
-  typePassword();
+  typePin();
 }
 
-// ── Handler: wake completo (power + attesa + password) ───────────
+// ── Handler: full wake sequence (power + wait + PIN) ─────────────
 void handleWake(WiFiClient& client) {
   sendResponse(client, 200,
     "{\"action\":\"wake\",\"boot_delay\":" + String(WIN_BOOT_DELAY) + "}");
@@ -98,28 +98,28 @@ void handleWake(WiFiClient& client) {
 
   pulsePower();
 
-  Serial.println("Attendo boot Windows...");
+  Serial.println("Waiting for Windows to boot...");
   for (int i = 0; i < WIN_BOOT_DELAY; i++) {
     delay(1000);
     Serial.print(".");
   }
   Serial.println();
 
-  typePassword();
+  typePin();
 }
 
-// ── Pulse D2 per PULSE_MS ms ─────────────────────────────────────
+// ── Pulse D2 for PULSE_MS ms ─────────────────────────────────────
 void pulsePower() {
-  Serial.println("Pulse power button");
+  Serial.println("Pulsing power button");
   digitalWrite(RELAY_PIN, HIGH);
   delay(PULSE_MS);
   digitalWrite(RELAY_PIN, LOW);
 }
 
-// ── Digita password + Invio tramite HID ──────────────────────────
-void typePassword() {
-  Serial.println("Digitazione password...");
-  // Premi un tasto qualsiasi per svegliare lo schermo (se in sleep)
+// ── Type PIN + Enter via HID ─────────────────────────────────────
+void typePin() {
+  Serial.println("Typing PIN...");
+  // Press a key to wake the screen in case it went to sleep
   Keyboard.press(KEY_LEFT_SHIFT);
   delay(100);
   Keyboard.releaseAll();
@@ -130,7 +130,7 @@ void typePassword() {
   Keyboard.press(KEY_RETURN);
   delay(100);
   Keyboard.releaseAll();
-  Serial.println("Password inviata");
+  Serial.println("PIN sent");
 }
 
 // ── HTTP response helper ──────────────────────────────────────────

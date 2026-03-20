@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """
-Gateway Flask sul Raspberry Pi Zero 2W.
-Riceve comandi via Tailscale e li forwarda all'Arduino via HTTP locale.
+Flask gateway on the Raspberry Pi Zero 2W.
+Receives commands over Tailscale and forwards them to the Arduino via LAN HTTP.
 """
 
 import os
@@ -10,10 +10,10 @@ from flask import Flask, jsonify, abort
 
 app = Flask(__name__)
 
-ARDUINO_IP  = os.environ.get("ARDUINO_IP") or exit("ARDUINO_IP non impostato nel .env")
-ARDUINO_URL = f"http://{ARDUINO_IP}"
-TIMEOUT     = 5  # secondi per chiamate rapide (power, status)
-WAKE_TIMEOUT = 10  # secondi — la risposta /wake arriva subito, ma la rete può essere lenta
+ARDUINO_IP   = os.environ.get("ARDUINO_IP") or exit("ARDUINO_IP not set in .env")
+ARDUINO_URL  = f"http://{ARDUINO_IP}"
+TIMEOUT      = 5   # seconds, for quick calls (power, status)
+WAKE_TIMEOUT = 10  # seconds — /wake responds immediately but network may be slow
 
 
 def call_arduino(endpoint: str, method: str = "POST", timeout: int = TIMEOUT):
@@ -23,9 +23,9 @@ def call_arduino(endpoint: str, method: str = "POST", timeout: int = TIMEOUT):
         resp.raise_for_status()
         return resp.json()
     except requests.exceptions.ConnectionError:
-        abort(502, description=f"Arduino non raggiungibile ({ARDUINO_IP})")
+        abort(502, description=f"Arduino unreachable ({ARDUINO_IP})")
     except requests.exceptions.Timeout:
-        abort(504, description="Timeout chiamata Arduino")
+        abort(504, description="Arduino request timed out")
     except requests.exceptions.HTTPError as e:
         abort(502, description=str(e))
 
@@ -34,21 +34,21 @@ def call_arduino(endpoint: str, method: str = "POST", timeout: int = TIMEOUT):
 
 @app.get("/status")
 def status():
-    """Verifica che Pi e Arduino siano raggiungibili."""
+    """Check that both Pi and Arduino are reachable."""
     arduino_status = call_arduino("/status", method="GET")
     return jsonify({"pi": "ok", "arduino": arduino_status})
 
 
 @app.post("/power")
 def power():
-    """Pulse power button (pressione singola da 200ms)."""
+    """Single 200ms power button pulse."""
     result = call_arduino("/power")
     return jsonify(result)
 
 
 @app.post("/type-password")
 def type_password():
-    """Digita la password sul PC (da usare se già acceso)."""
+    """Type the Windows PIN via HID (use when PC is already on)."""
     result = call_arduino("/type-password")
     return jsonify(result)
 
@@ -56,8 +56,8 @@ def type_password():
 @app.post("/wake")
 def wake():
     """
-    Wake completo: power pulse → attesa boot → digitazione password.
-    L'Arduino risponde subito (202) e poi esegue in background.
+    Full wake sequence: power pulse → wait for boot → type PIN.
+    Arduino responds immediately; the sequence runs on the Arduino side.
     """
     result = call_arduino("/wake", timeout=WAKE_TIMEOUT)
     return jsonify(result), 202
@@ -74,5 +74,5 @@ def gateway_error(e):
 # ── Main ─────────────────────────────────────────────────────────
 
 if __name__ == "__main__":
-    # Ascolta su tutte le interfacce (Tailscale inclusa), porta 5000
+    # Listen on all interfaces (Tailscale included), port 5000
     app.run(host="0.0.0.0", port=5000, debug=False)

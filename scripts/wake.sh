@@ -1,26 +1,26 @@
 #!/usr/bin/env bash
-# wake.sh — Sveglia il PC Windows da remoto via Tailscale → Pi → Arduino
-# Uso: ./scripts/wake.sh [comando]
-#   Comandi disponibili:
-#     wake          (default) power + attesa boot + password
-#     power         solo pulse power button
-#     type-password solo digitazione password (PC già acceso)
-#     status        verifica che Pi e Arduino siano raggiungibili
+# wake.sh — Wake the Windows PC remotely via Tailscale → Pi → Arduino
+# Usage: ./scripts/wake.sh [command]
+#   Commands:
+#     wake          (default) power pulse + wait for boot + type PIN
+#     power         power button pulse only
+#     type-password type PIN only (PC already on)
+#     status        check Pi and Arduino connectivity
 
 set -euo pipefail
 
-# ── Configurazione ───────────────────────────────────────────────
+# ── Configuration ────────────────────────────────────────────────
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 ENV_FILE="${SCRIPT_DIR}/../.env"
 
-# Carica .env se esiste
+# Load .env if present
 if [ -f "${ENV_FILE}" ]; then
   set -a
   source "${ENV_FILE}"
   set +a
 fi
 
-PI_TAILSCALE_IP="${PI_TAILSCALE_IP:?Imposta PI_TAILSCALE_IP nel file .env}"
+PI_TAILSCALE_IP="${PI_TAILSCALE_IP:?Set PI_TAILSCALE_IP in .env}"
 PI_PORT="${PI_PORT:-5000}"
 BASE_URL="http://${PI_TAILSCALE_IP}:${PI_PORT}"
 
@@ -33,7 +33,7 @@ err()     { echo "[error] $*" >&2; exit 1; }
 
 check_deps() {
   for dep in curl jq; do
-    command -v "${dep}" &>/dev/null || err "${dep} non trovato. Installa con: brew install ${dep}"
+    command -v "${dep}" &>/dev/null || err "${dep} not found. Install with: brew install ${dep}"
   done
 }
 
@@ -49,7 +49,7 @@ call_pi() {
     -X "${method}" \
     --connect-timeout 10 \
     --max-time "${timeout}" \
-    "${BASE_URL}${endpoint}" 2>/dev/null) || err "Impossibile raggiungere il Pi (${PI_TAILSCALE_IP}). Tailscale attivo?"
+    "${BASE_URL}${endpoint}" 2>/dev/null) || err "Cannot reach Pi (${PI_TAILSCALE_IP}). Is Tailscale up?"
 
   http_code=$(echo "${resp}" | tail -n1)
   body=$(echo "${resp}" | head -n-1)
@@ -57,40 +57,39 @@ call_pi() {
   if [[ "${http_code}" =~ ^2 ]]; then
     echo "${body}" | jq . 2>/dev/null || echo "${body}"
   else
-    err "Il Pi ha risposto HTTP ${http_code}: ${body}"
+    err "Pi responded HTTP ${http_code}: ${body}"
   fi
 }
 
-# ── Comandi ──────────────────────────────────────────────────────
+# ── Commands ─────────────────────────────────────────────────────
 cmd_status() {
-  info "Verifica stato Pi e Arduino..."
+  info "Checking Pi and Arduino status..."
   call_pi "/status" "GET" 10
-  success "Tutto raggiungibile."
+  success "All reachable."
 }
 
 cmd_power() {
-  info "Invio pulse power button..."
+  info "Sending power button pulse..."
   call_pi "/power" "POST" 10
-  success "Pulse inviato."
+  success "Pulse sent."
 }
 
 cmd_type_password() {
-  info "Digitazione password in corso..."
+  info "Typing PIN..."
   call_pi "/type-password" "POST" 10
-  success "Password inviata."
+  success "PIN sent."
 }
 
 cmd_wake() {
-  info "Avvio sequenza wake completa..."
-  info "  1. Pulse power button"
-  info "  2. Attesa boot Windows (~35s)"
-  info "  3. Digitazione password"
+  info "Starting full wake sequence..."
+  info "  1. Power button pulse"
+  info "  2. Waiting for Windows to boot (~35s)"
+  info "  3. Typing PIN"
   call_pi "/wake" "POST" 15
-  success "Sequenza wake avviata. Il PC sarà pronto tra ~35 secondi."
+  success "Wake sequence started. PC should be ready in ~35 seconds."
   echo ""
-  echo "Per connetterti via RDP:"
-  echo "  open rdp://192.168.1.10"
-  echo "  (oppure usa Microsoft Remote Desktop e inserisci 192.168.1.10)"
+  echo "Connect via RDP once the PC is up:"
+  echo "  open rdp://<windows-pc-ip>"
 }
 
 # ── Main ─────────────────────────────────────────────────────────
@@ -102,11 +101,11 @@ case "${CMD}" in
   type-password)  cmd_type_password ;;
   status)         cmd_status ;;
   *)
-    echo "Uso: $0 [wake|power|type-password|status]"
-    echo "  wake          (default) sequenza completa"
-    echo "  power         solo pulse power button"
-    echo "  type-password solo digitazione password"
-    echo "  status        verifica connettività"
+    echo "Usage: $0 [wake|power|type-password|status]"
+    echo "  wake          (default) full sequence"
+    echo "  power         power button pulse only"
+    echo "  type-password type PIN only"
+    echo "  status        check connectivity"
     exit 1
     ;;
 esac
