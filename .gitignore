@@ -1,0 +1,19 @@
+# Variabili d'ambiente (contengono credenziali!)
+.env
+
+# Arduino config con credenziali
+arduino/main/config.h
+
+# Python
+__pycache__/
+*.pyc
+*.pyo
+pi/venv/
+
+# macOS
+.DS_Store
+
+# Arduino
+*.elf
+*.hex
+build/
