@@ -125,7 +125,7 @@ void typePassword() {
   Keyboard.releaseAll();
   delay(500);
 
-  Keyboard.print(WIN_PASSWORD);
+  Keyboard.print(WIN_PIN);
   delay(100);
   Keyboard.press(KEY_RETURN);
   delay(100);

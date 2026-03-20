@@ -3,7 +3,8 @@
 
 #define WIFI_SSID        ""
 #define WIFI_PASSWORD    ""
-#define WIN_PASSWORD     ""
+// Normally your 4-digit PIN; rarely Windows may require the full account password
+#define WIN_PIN          ""
 
 // Static IP for this Arduino
 #define LOCAL_IP_0  192
