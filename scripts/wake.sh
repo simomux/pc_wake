@@ -2,10 +2,9 @@
 # wake.sh — Wake the Windows PC remotely via Tailscale → Pi → Arduino
 # Usage: ./scripts/wake.sh [command]
 #   Commands:
-#     wake          (default) power pulse + wait for boot + type PIN
-#     power         power button pulse only
-#     type-password type PIN only (PC already on)
-#     status        check Pi and Arduino connectivity
+#     wake    (default) power pulse + wait for PC to be ready + open RDP
+#     power   power button pulse only
+#     status  check Pi and Arduino connectivity
 
 set -euo pipefail
 
@@ -21,6 +20,7 @@ if [ -f "${ENV_FILE}" ]; then
 fi
 
 PI_TAILSCALE_IP="${PI_TAILSCALE_IP:?Set PI_TAILSCALE_IP in .env}"
+WIN_PC_IP="${WIN_PC_IP:?Set WIN_PC_IP in .env}"
 PI_PORT="${PI_PORT:-5000}"
 BASE_URL="http://${PI_TAILSCALE_IP}:${PI_PORT}"
 
@@ -74,38 +74,26 @@ cmd_power() {
   success "Pulse sent."
 }
 
-cmd_type_password() {
-  info "Typing PIN..."
-  call_pi "/type-password" "POST" 10
-  success "PIN sent."
-}
-
 cmd_wake() {
-  info "Starting full wake sequence..."
-  info "  1. Power button pulse"
-  info "  2. Waiting for Windows to boot (~35s)"
-  info "  3. Typing PIN"
-  call_pi "/wake" "POST" 15
-  success "Wake sequence started. PC should be ready in ~35 seconds."
-  echo ""
-  echo "Connect via RDP once the PC is up:"
-  echo "  open rdp://<windows-pc-ip>"
+  info "Sending power pulse and waiting for PC to come up..."
+  # /wake blocks until the PC responds to ping (up to 90s)
+  call_pi "/wake" "POST" 100
+  success "PC is up. Opening RDP..."
+  open "rdp://full%20address=s:${WIN_PC_IP}"
 }
 
 # ── Main ─────────────────────────────────────────────────────────
 check_deps
 
 case "${CMD}" in
-  wake)           cmd_wake ;;
-  power)          cmd_power ;;
-  type-password)  cmd_type_password ;;
-  status)         cmd_status ;;
+  wake)    cmd_wake ;;
+  power)   cmd_power ;;
+  status)  cmd_status ;;
   *)
-    echo "Usage: $0 [wake|power|type-password|status]"
-    echo "  wake          (default) full sequence"
-    echo "  power         power button pulse only"
-    echo "  type-password type PIN only"
-    echo "  status        check connectivity"
+    echo "Usage: $0 [wake|power|status]"
+    echo "  wake    (default) full sequence + open RDP"
+    echo "  power   power button pulse only"
+    echo "  status  check connectivity"
     exit 1
     ;;
 esac

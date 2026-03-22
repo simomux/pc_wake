@@ -5,15 +5,20 @@ Receives commands over Tailscale and forwards them to the Arduino via LAN HTTP.
 """
 
 import os
+import subprocess
+import time
 import requests
 from flask import Flask, jsonify, abort
 
 app = Flask(__name__)
 
-ARDUINO_IP   = os.environ.get("ARDUINO_IP") or exit("ARDUINO_IP not set in .env")
-ARDUINO_URL  = f"http://{ARDUINO_IP}"
-TIMEOUT      = 5   # seconds, for quick calls (power, status)
-WAKE_TIMEOUT = 10  # seconds — /wake responds immediately but network may be slow
+ARDUINO_IP  = os.environ.get("ARDUINO_IP")  or exit("ARDUINO_IP not set in .env")
+WIN_PC_IP   = os.environ.get("WIN_PC_IP")   or exit("WIN_PC_IP not set in .env")
+ARDUINO_URL = f"http://{ARDUINO_IP}"
+
+TIMEOUT       = 5    # seconds, for quick calls
+PING_INTERVAL = 3    # seconds between ping attempts
+PING_TIMEOUT  = 90   # seconds max wait for PC to come up
 
 
 def call_arduino(endpoint: str, method: str = "POST", timeout: int = TIMEOUT):
@@ -28,6 +33,21 @@ def call_arduino(endpoint: str, method: str = "POST", timeout: int = TIMEOUT):
         abort(504, description="Arduino request timed out")
     except requests.exceptions.HTTPError as e:
         abort(502, description=str(e))
+
+
+def wait_for_pc(timeout: int = PING_TIMEOUT) -> bool:
+    """Ping WIN_PC_IP every PING_INTERVAL seconds until it responds or timeout."""
+    deadline = time.time() + timeout
+    while time.time() < deadline:
+        result = subprocess.run(
+            ["ping", "-c", "1", "-W", "1", WIN_PC_IP],
+            stdout=subprocess.DEVNULL,
+            stderr=subprocess.DEVNULL
+        )
+        if result.returncode == 0:
+            return True
+        time.sleep(PING_INTERVAL)
+    return False
 
 
 # ── Endpoints ────────────────────────────────────────────────────
@@ -46,21 +66,18 @@ def power():
     return jsonify(result)
 
 
-@app.post("/type-password")
-def type_password():
-    """Type the Windows PIN via HID (use when PC is already on)."""
-    result = call_arduino("/type-password")
-    return jsonify(result)
-
-
 @app.post("/wake")
 def wake():
     """
-    Full wake sequence: power pulse → wait for boot → type PIN.
-    Arduino responds immediately; the sequence runs on the Arduino side.
+    Full wake sequence: power pulse → wait for PC to respond to ping → return ready.
+    Blocks until the PC is reachable (up to PING_TIMEOUT seconds).
     """
-    result = call_arduino("/wake", timeout=WAKE_TIMEOUT)
-    return jsonify(result), 202
+    call_arduino("/power")
+
+    if not wait_for_pc():
+        abort(504, description=f"PC did not come up within {PING_TIMEOUT}s")
+
+    return jsonify({"status": "ready", "pc": WIN_PC_IP})
 
 
 # ── Error handlers ───────────────────────────────────────────────

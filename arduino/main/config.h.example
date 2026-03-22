@@ -1,10 +1,8 @@
 // Copy this file to config.h and fill in your values.
 // config.h is gitignored — never commit it.
 
-#define WIFI_SSID        ""
-#define WIFI_PASSWORD    ""
-// Normally your 4-digit PIN; rarely Windows may require the full account password
-#define WIN_PIN          ""
+#define WIFI_SSID     ""
+#define WIFI_PASSWORD ""
 
 // Static IP for this Arduino (e.g. 192, 168, 1, 20)
 #define LOCAL_IP_0  0
