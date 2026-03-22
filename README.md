@@ -1,14 +1,13 @@
 # pc-remote
 
-Wake your Windows PC remotely via Arduino + Raspberry Pi + Tailscale.
+Wake your Windows PC remotely via Arduino + Raspberry Pi + Tailscale, then connect automatically via RDP.
 
 ```
 MacBook (Tailscale)
   → Pi Zero 2W (Tailscale subnet router)
     → Arduino R4 WiFi (LAN HTTP server)
       → transistor relay → motherboard power button
-      → USB HID keyboard → types login password
-  → RDP → Windows 11 PC
+  → RDP (opened automatically once PC is up)
 ```
 
 ## Project structure
@@ -18,14 +17,21 @@ pc-remote/
 ├── .env.example                 # copy to .env and fill in your values
 ├── arduino/main/
 │   ├── config.h.example         # copy to config.h and fill in your values
-│   └── main.ino                 # HTTP server + relay + HID keyboard
+│   └── main.ino                 # HTTP server + power button relay
 ├── pi/
-│   ├── app.py                   # Flask gateway on the Pi
+│   ├── app.py                   # Flask gateway: forwards power pulse, pings PC until up
 │   ├── requirements.txt
 │   └── install.sh               # automated setup: Tailscale + Flask + systemd
 └── scripts/
-    └── wake.sh                  # Mac-side script: wake the PC over Tailscale
+    └── wake.sh                  # Mac script: wake PC + open RDP automatically
 ```
+
+## How it works
+
+1. `./scripts/wake.sh` calls `POST /wake` on the Pi over Tailscale
+2. Pi tells the Arduino to pulse the power button
+3. Pi pings the Windows PC every 3s until it responds (up to 90s)
+4. Once the PC is up, `wake.sh` opens RDP automatically
 
 ## Setup
 
@@ -33,20 +39,20 @@ pc-remote/
 
 ```bash
 cp .env.example .env
-# fill in .env with your WiFi, Arduino IP, Windows password, and Pi Tailscale IP
+# fill in ARDUINO_IP, WIN_PC_IP, and PI_TAILSCALE_IP
 ```
 
 ### 2. Arduino
 
 ```bash
 cp arduino/main/config.h.example arduino/main/config.h
-# fill in config.h with WiFi credentials, Windows password, and desired static IP
+# fill in WIFI_SSID, WIFI_PASSWORD, and the static IP octets
 ```
 
-Open `arduino/main/main.ino` in Arduino IDE and upload. Verify connectivity:
+Open `arduino/main/main.ino` in Arduino IDE and upload. Verify:
 
 ```bash
-curl -X GET http://<arduino-ip>/status
+curl http://<arduino-ip>/status   # → {"status":"ok"}
 ```
 
 ### 3. Raspberry Pi Zero 2W
@@ -73,10 +79,9 @@ Add the Pi's Tailscale IP to `.env` → `PI_TAILSCALE_IP`.
 
 ```bash
 chmod +x scripts/wake.sh
-./scripts/wake.sh            # full sequence: power + wait for boot + password
-./scripts/wake.sh status     # check Pi and Arduino connectivity
-./scripts/wake.sh power      # pulse power button only
-./scripts/wake.sh type-password  # type password only (PC already on)
+./scripts/wake.sh           # power pulse + wait for PC + open RDP
+./scripts/wake.sh power     # power button pulse only
+./scripts/wake.sh status    # check Pi and Arduino connectivity
 ```
 
 ## Transistor wiring (PN2222A)
@@ -94,13 +99,15 @@ The physical power button stays wired in parallel and keeps working normally.
 
 ### Arduino (port 80)
 
-| Method | Endpoint         | Action                                        |
-|--------|------------------|-----------------------------------------------|
-| GET    | `/status`        | Returns `{"status":"ok"}`                     |
-| POST   | `/power`         | 200ms pulse on D2 (power button press)        |
-| POST   | `/type-password` | Types the Windows password via HID + Enter    |
-| POST   | `/wake`          | Full sequence: power → wait for boot → password |
+| Method | Endpoint  | Action                          |
+|--------|-----------|---------------------------------|
+| GET    | `/status` | Returns `{"status":"ok"}`       |
+| POST   | `/power`  | 200ms pulse on D2 (power button)|
 
 ### Pi Flask gateway (port 5000)
 
-Same endpoints — the Pi proxies every request to the Arduino.
+| Method | Endpoint  | Action                                                        |
+|--------|-----------|---------------------------------------------------------------|
+| GET    | `/status` | Check Pi and Arduino reachability                             |
+| POST   | `/power`  | Forward power pulse to Arduino                                |
+| POST   | `/wake`   | Power pulse + ping PC until up (blocks up to 90s) → `{"status":"ready"}` |
