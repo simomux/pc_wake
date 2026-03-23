@@ -26,11 +26,12 @@ else
 fi
 
 echo "=== [3/5] Enabling IP forwarding (subnet router) ==="
-grep -qxF 'net.ipv4.ip_forward=1' /etc/sysctl.conf \
-  || echo 'net.ipv4.ip_forward=1' >> /etc/sysctl.conf
-grep -qxF 'net.ipv6.conf.all.forwarding=1' /etc/sysctl.conf \
-  || echo 'net.ipv6.conf.all.forwarding=1' >> /etc/sysctl.conf
-sysctl -p -q
+SYSCTL_CONF="/etc/sysctl.d/99-pc-remote.conf"
+grep -qxF 'net.ipv4.ip_forward=1' "${SYSCTL_CONF}" 2>/dev/null \
+  || echo 'net.ipv4.ip_forward=1' >> "${SYSCTL_CONF}"
+grep -qxF 'net.ipv6.conf.all.forwarding=1' "${SYSCTL_CONF}" 2>/dev/null \
+  || echo 'net.ipv6.conf.all.forwarding=1' >> "${SYSCTL_CONF}"
+sysctl -p "${SYSCTL_CONF}"
 
 echo "=== [4/5] Setting up Flask virtualenv ==="
 python3 -m venv "${APP_DIR}/venv"
