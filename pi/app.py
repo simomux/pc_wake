@@ -8,13 +8,21 @@ import os
 import subprocess
 import time
 import requests
-from flask import Flask, jsonify, abort
+from flask import Flask, jsonify, abort, request
 
 app = Flask(__name__)
 
 ARDUINO_IP  = os.environ.get("ARDUINO_IP")  or exit("ARDUINO_IP not set in .env")
 WIN_PC_IP   = os.environ.get("WIN_PC_IP")   or exit("WIN_PC_IP not set in .env")
+API_SECRET  = os.environ.get("API_SECRET")  or exit("API_SECRET not set in .env")
 ARDUINO_URL = f"http://{ARDUINO_IP}"
+
+
+@app.before_request
+def check_auth():
+    token = request.headers.get("Authorization", "")
+    if token != f"Bearer {API_SECRET}":
+        abort(401, description="Unauthorized")
 
 TIMEOUT       = 5    # seconds, for quick calls
 PING_INTERVAL = 3    # seconds between ping attempts
@@ -82,6 +90,7 @@ def wake():
 
 # ── Error handlers ───────────────────────────────────────────────
 
+@app.errorhandler(401)
 @app.errorhandler(502)
 @app.errorhandler(504)
 def gateway_error(e):

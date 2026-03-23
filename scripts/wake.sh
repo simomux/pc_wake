@@ -21,6 +21,7 @@ fi
 
 PI_TAILSCALE_IP="${PI_TAILSCALE_IP:?Set PI_TAILSCALE_IP in .env}"
 WIN_PC_IP="${WIN_PC_IP:?Set WIN_PC_IP in .env}"
+API_SECRET="${API_SECRET:?Set API_SECRET in .env}"
 PI_PORT="${PI_PORT:-5000}"
 BASE_URL="http://${PI_TAILSCALE_IP}:${PI_PORT}"
 
@@ -47,12 +48,13 @@ call_pi() {
 
   resp=$(curl -s -w "\n%{http_code}" \
     -X "${method}" \
+    -H "Authorization: Bearer ${API_SECRET}" \
     --connect-timeout 10 \
     --max-time "${timeout}" \
     "${BASE_URL}${endpoint}" 2>/dev/null) || err "Cannot reach Pi (${PI_TAILSCALE_IP}). Is Tailscale up?"
 
   http_code=$(echo "${resp}" | tail -n1)
-  body=$(echo "${resp}" | head -n-1)
+  body=$(echo "${resp}" | sed '$d')
 
   if [[ "${http_code}" =~ ^2 ]]; then
     echo "${body}" | jq . 2>/dev/null || echo "${body}"
