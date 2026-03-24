@@ -1,4 +1,5 @@
 #include <WiFiS3.h>
+#include <ArduinoOTA.h>
 #include "config.h"   // copy config.h.example → config.h and fill in your values
 
 // ── Configuration ───────────────────────────────────────────────
@@ -36,9 +37,15 @@ void setup() {
 
   server.begin();
   Serial.println("HTTP server started");
+
+  // OTA — reachable from Arduino IDE as a network port (same LAN only)
+  ArduinoOTA.begin(WiFi.localIP(), "Arduino_UNO_R4", OTA_PASSWORD, InternalStorage);
+  Serial.println("OTA ready");
 }
 
 void loop() {
+  ArduinoOTA.poll();
+
   WiFiClient client = server.available();
   if (!client) return;
 

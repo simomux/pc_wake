@@ -3,6 +3,7 @@
 
 #define WIFI_SSID     ""
 #define WIFI_PASSWORD ""
+#define OTA_PASSWORD  ""   // password required by Arduino IDE to upload via WiFi
 
 // Static IP for this Arduino (e.g. 192, 168, 1, 20)
 #define LOCAL_IP_0  0
