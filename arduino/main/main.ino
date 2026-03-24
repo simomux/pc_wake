@@ -40,6 +40,13 @@ void setup() {
 
   // OTA — reachable from Arduino IDE as a network port (same LAN only)
   ArduinoOTA.begin(WiFi.localIP(), "Arduino_UNO_R4", OTA_PASSWORD, InternalStorage);
+  ArduinoOTA.onStart([]() { Serial.println("OTA start"); });
+  ArduinoOTA.onError([](int code, const char* msg) {
+    Serial.print("OTA error ");
+    Serial.print(code);
+    Serial.print(": ");
+    Serial.println(msg);
+  });
   Serial.println("OTA ready");
 }
 
