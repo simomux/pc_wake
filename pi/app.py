@@ -78,14 +78,21 @@ def power():
 def wake():
     """
     Full wake sequence: power pulse → wait for PC to respond to ping → return ready.
+    If the PC is already up, skips the power pulse.
     Blocks until the PC is reachable (up to PING_TIMEOUT seconds).
     """
-    call_arduino("/power")
+    already_up = subprocess.run(
+        ["ping", "-c", "1", "-W", "1", WIN_PC_IP],
+        stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL
+    ).returncode == 0
 
-    if not wait_for_pc():
+    if not already_up:
+        call_arduino("/power")
+
+    if not already_up and not wait_for_pc():
         abort(504, description=f"PC did not come up within {PING_TIMEOUT}s")
 
-    return jsonify({"status": "ready", "pc": WIN_PC_IP})
+    return jsonify({"status": "ready", "pc": WIN_PC_IP, "was_on": already_up})
 
 
 # ── Error handlers ───────────────────────────────────────────────
