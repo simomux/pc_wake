@@ -81,7 +81,7 @@ cmd_wake() {
   # /wake blocks until the PC responds to ping (up to 90s)
   call_pi "/wake" "POST" 100
   success "PC is up. Opening RDP..."
-  open "rdp://full%20address=s:${WIN_PC_IP}"
+  open -a "Windows App"
 }
 
 # ── Main ─────────────────────────────────────────────────────────
